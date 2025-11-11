@@ -1,62 +1,42 @@
-const loginDiv = document.getElementById('loginDiv');
-const chatDiv = document.getElementById('chatDiv');
-const chatBox = document.getElementById('chat');
-const input = document.getElementById('msgInput');
-const sendBtn = document.getElementById('sendBtn');
+let bannedWords = [];
 
-document.getElementById('registerBtn').addEventListener('click', async () => {
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value;
-  if (!username || !password) return alert('Enter username and password');
+// Load the .txt files from your project
+Promise.all([
+  fetch('en.txt').then(res => res.text().then(t => t.split('\n'))),
+  fetch('emoji.txt').then(res => res.text().then(t => t.split('\n')))
+]).then(arrays => {
+  // Combine all words/phrases/emojis into one array
+  bannedWords = arrays.flat().map(item => item.toLowerCase());
+  console.log("Banned words/emoji loaded:", bannedWords.length);
+});
 
-  const res = await fetch('/register', {
+// Function to send messages
+function sendMessage() {
+  const msgInput = document.getElementById('msgInput');
+  let message = msgInput.value.trim();
+
+  // Check for banned words/phrases/emojis (case-insensitive)
+  const containsBanned = bannedWords.some(word =>
+    message.toLowerCase().includes(word)
+  );
+
+  if (containsBanned) {
+    alert("Please do not send inappropriate content!");
+    msgInput.value = "";
+    return;
+  }
+
+  // Send the clean message to the server
+  fetch('/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ message, username: currentUser })
   });
-  if (res.ok) showChat();
-  else alert(await res.text());
-});
 
-document.getElementById('loginBtn').addEventListener('click', async () => {
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value;
-  if (!username || !password) return alert('Enter username and password');
-
-  const res = await fetch('/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  });
-  if (res.ok) showChat();
-  else alert(await res.text());
-});
-
-function showChat() {
-  loginDiv.style.display = 'none';
-  chatDiv.style.display = 'block';
-  fetchMessages();
-  setInterval(fetchMessages, 1000);
+  msgInput.value = "";
 }
 
-sendBtn.addEventListener('click', async () => {
-  const msg = input.value.trim();
-  if (!msg) return;
-  await fetch('/send', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ msg }) });
-  input.value = '';
-  fetchMessages();
+// Optional: allow Enter key to send message
+document.getElementById('msgInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') sendMessage();
 });
-
-input.addEventListener('keydown', e => { if(e.key==='Enter') sendBtn.click(); });
-
-async function fetchMessages() {
-  const res = await fetch('/messages');
-  const msgs = await res.json();
-  chatBox.innerHTML = '';
-  msgs.forEach(m => {
-    const div = document.createElement('div');
-    div.textContent = m.user + ': ' + m.msg;
-    chatBox.appendChild(div);
-  });
-  chatBox.scrollTop = chatBox.scrollHeight;
-}
